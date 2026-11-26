@@ -31,7 +31,7 @@ Control your remote Google Antigravity backend (`agy`) from iPhone with Apple HI
 | :--- | :--- | :--- | :--- |
 | **iOS App (`ios/AntiRemote`)** | **Swift 6.2** | SwiftUI, Observation (`@Observable`), AVFoundation, Security (Keychain), XcodeGen | Native 4-tab iPhone/iPad control client (`iOS 18.0+`, Liquid Glass on `iOS 26+`) |
 | **Core SDK (`ios/Packages/AntiCore`)** | **Swift 6.2** | SwiftPM, `URLSession` + `URLSessionWebSocketTask`, Swift Testing (`@Test`) | Sendable REST/WebSocket client, Keychain token store, pairing URI parser, offline Demo rig |
-| **Remote Bridge (`bridge/`)** | **JavaScript (ESM)** | Node.js 20+ stdlib only (`node:http`, `node:https`, `node:crypto`, RFC 6455 WS, ISO QR) | Zero-dependency daemon wrapping documented `agy` CLI, jailed workspace files/git, MCP/settings |
+| **Remote Bridge (`anti-bridge`)** | **JavaScript (ESM)** | Separate project (`/srv/antigravity/anti-bridge`) — Electron Tray/Menubar GUI + Node.js 20+ CLI | Cross-platform Windows / macOS / Linux remote bridge wrapping documented `agy` CLI |
 | **CI/CD & Changelog (`.github/`)** | **YAML + JavaScript** | GitHub Actions (`macos-15` Xcode 26.3, `ubuntu-latest`), `gh` CLI | Automated Bridge + Swift tests, `.ipa` build (signed/unsigned), auto Vietnamese GitHub Release |
 
 ## Adaptive iOS 18 & iOS 26 Liquid Glass UI
@@ -44,19 +44,24 @@ Built against the **Xcode 26 (iOS 26 SDK)** with `deploymentTarget: 18.0`:
 ## Repository Layout
 
 - `assets/logo.png` — Continuous-squircle brand logo preview for docs & releases.
-- `bridge/` — Zero-dependency Node.js (v20+) HTTPS/WSS Remote Bridge daemon wrapping documented `agy` CLI commands (`agy -p ... --output-format stream-json`, `agy remote-control start|stop|status`), jailed workspace file & git inspection, `~/.gemini/antigravity-cli/settings.json` management, and terminal QR pairing.
 - `ios/` — Native SwiftUI iOS 18+ app (`Swift 6`, `XcodeGen` `project.yml`) + `Packages/AntiCore` Swift Package.
 - `.github/workflows/ios-ipa-release.yml` & `.github/scripts/generate-vi-changelog.mjs` — Automated `.ipa` build and Vietnamese changelog release pipeline.
 - `PRODUCT.md` & `DESIGN.md` — Product truth and Apple HIG design system contract.
 
-## 1. Run the Remote Bridge (Linux / macOS Remote Machine)
+> **Companion Remote Bridge:** Split into its own standalone cross-platform project at `/srv/antigravity/anti-bridge` (Windows / macOS / Linux Desktop GUI with taskbar tray / macOS menubar + zero-dependency headless CLI).
 
-Requires Node.js >= 20 (zero `npm install` needed):
+## 1. Run the Companion Remote Bridge (`anti-bridge`)
+
+On your remote Windows, macOS, or Linux machine:
 
 ```bash
-cd bridge
-npm test
+cd /srv/antigravity/anti-bridge
+
+# Headless CLI (zero install, Node.js 20+)
 node ./src/cli.mjs --workspace /path/to/your/project
+
+# Or Desktop GUI (Windows taskbar tray / macOS menubar / Linux system tray)
+npm install && npm run gui
 ```
 
 - Automatically uses `agy` when installed on `PATH` (`--adapter auto`), or falls back cleanly to `--adapter mock` for local testing.

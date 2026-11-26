@@ -32,8 +32,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  bridge-test:
-    name: Test Bridge Daemon & Changelog Script
+  preflight:
+    name: Validate Vietnamese Changelog Script
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -48,16 +48,12 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Run Bridge E2E test suite
-        working-directory: bridge
-        run: npm test
-
       - name: Validate Vietnamese changelog generator
         run: node .github/scripts/generate-vi-changelog.mjs --dry-run > /dev/null
 
   build-ipa:
     name: Test AntiCore & Build iOS IPA
-    needs: [bridge-test]
+    needs: [preflight]
     runs-on: macos-15
     timeout-minutes: 30
     outputs:
