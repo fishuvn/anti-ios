@@ -14,76 +14,103 @@ struct ComposerBarView: View {
     let onOpenPalette: () -> Void
 
     var body: some View {
-        VStack(spacing: 8) {
+        let content = VStack(spacing: 8) {
             if !quickCommands.isEmpty {
                 quickSlashDeck
             }
 
-            HStack(alignment: .bottom, spacing: 8) {
-                Button(action: onOpenPalette) {
-                    Image(systemName: "command")
-                        .font(.body.weight(.semibold))
-                        .frame(width: 44, height: 44)
-                        .background(Color(.secondarySystemFill), in: Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Slash commands")
-                .accessibilityHint("Opens the full searchable slash-command deck.")
-
-                TextField("Message Antigravity or type /command...", text: $text, axis: .vertical)
-                    .lineLimit(1 ... 5)
-                    .textFieldStyle(.plain)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .strokeBorder(Color(.separator).opacity(0.45), lineWidth: 1)
-                    )
-                    .focused(isFocused)
-                    .submitLabel(.send)
-                    .onSubmit {
-                        if canSend { onSend() }
-                    }
-                    .disabled(isDisabled)
-
-                if isStreaming {
-                    Button(role: .destructive, action: onStop) {
-                        Image(systemName: "stop.fill")
+            AdaptiveGlassGroup(spacing: 8) {
+                HStack(alignment: .bottom, spacing: 8) {
+                    Button(action: onOpenPalette) {
+                        Image(systemName: "command")
                             .font(.body.weight(.semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                             .frame(width: 44, height: 44)
-                            .background(Color.red, in: Circle())
+                            .adaptiveGlassSurface(
+                                in: Circle(),
+                                interactive: true,
+                                fallbackBackground: Color(.secondarySystemFill)
+                            )
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Stop active run")
-                } else {
-                    Button(action: onSend) {
-                        Group {
-                            if isSending {
-                                ProgressView()
-                                    .tint(.white)
-                            } else {
-                                Image(systemName: "arrow.up")
-                                    .font(.body.weight(.bold))
-                                    .foregroundStyle(.white)
-                            }
+                    .accessibilityLabel("Slash commands")
+                    .accessibilityHint("Opens the full searchable slash-command deck.")
+
+                    TextField("Message Antigravity or type /command...", text: $text, axis: .vertical)
+                        .lineLimit(1 ... 5)
+                        .textFieldStyle(.plain)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .adaptiveGlassSurface(
+                            in: RoundedRectangle(cornerRadius: 22, style: .continuous),
+                            interactive: true,
+                            fallbackBackground: Color(.secondarySystemGroupedBackground),
+                            fallbackStroke: Color(.separator).opacity(0.45)
+                        )
+                        .focused(isFocused)
+                        .submitLabel(.send)
+                        .onSubmit {
+                            if canSend { onSend() }
                         }
-                        .frame(width: 44, height: 44)
-                        .background(canSend ? Color.accentColor : Color(.quaternaryLabel), in: Circle())
+                        .disabled(isDisabled)
+
+                    if isStreaming {
+                        Button(role: .destructive, action: onStop) {
+                            Image(systemName: "stop.fill")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 44, height: 44)
+                                .adaptiveGlassSurface(
+                                    in: Circle(),
+                                    tint: .red,
+                                    interactive: true,
+                                    fallbackBackground: Color.red
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Stop active run")
+                    } else {
+                        Button(action: onSend) {
+                            Group {
+                                if isSending {
+                                    ProgressView()
+                                        .tint(.white)
+                                } else {
+                                    Image(systemName: "arrow.up")
+                                        .font(.body.weight(.bold))
+                                        .foregroundStyle(canSend ? .white : .secondary)
+                                }
+                            }
+                            .frame(width: 44, height: 44)
+                            .adaptiveGlassSurface(
+                                in: Circle(),
+                                tint: canSend ? .accentColor : nil,
+                                interactive: canSend,
+                                fallbackBackground: canSend ? Color.accentColor : Color(.quaternaryLabel)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!canSend)
+                        .accessibilityLabel("Send message")
                     }
-                    .buttonStyle(.plain)
-                    .disabled(!canSend)
-                    .accessibilityLabel("Send message")
                 }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
             }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 8)
         }
         .padding(.top, 8)
-        .background(.bar)
-        .overlay(alignment: .top) {
-            Divider()
+
+        if AdaptiveInterfaceStyle.isLiquidGlassActive {
+            // On iOS 26+, floating Liquid Glass controls hover directly over scrolled content without a solid chrome slab.
+            content
+                .background(Color.clear)
+        } else {
+            // On iOS 18–25, render the standard system translucent bar with crisp hairline separation.
+            content
+                .background(.bar)
+                .overlay(alignment: .top) {
+                    Divider()
+                }
         }
     }
 
@@ -93,30 +120,33 @@ struct ComposerBarView: View {
 
     private var quickSlashDeck: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(quickCommands.prefix(6)) { cmd in
-                    Button {
-                        onTriggerCommand(cmd)
-                    } label: {
-                        Label(cmd.command, systemImage: cmd.symbol)
-                            .font(.footnote.monospaced().weight(.medium))
-                            .foregroundStyle(.primary)
-                            .padding(.horizontal, 12)
-                            .frame(minHeight: 36)
-                            .background(Color(.secondarySystemGroupedBackground), in: Capsule())
-                            .overlay(
-                                Capsule()
-                                    .strokeBorder(Color(.separator).opacity(0.4), lineWidth: 1)
-                            )
+            AdaptiveGlassGroup(spacing: 8) {
+                HStack(spacing: 8) {
+                    ForEach(quickCommands.prefix(6)) { cmd in
+                        Button {
+                            onTriggerCommand(cmd)
+                        } label: {
+                            Label(cmd.command, systemImage: cmd.symbol)
+                                .font(.footnote.monospaced().weight(.medium))
+                                .foregroundStyle(.primary)
+                                .padding(.horizontal, 12)
+                                .frame(minHeight: 36)
+                                .adaptiveGlassSurface(
+                                    in: Capsule(),
+                                    interactive: true,
+                                    fallbackBackground: Color(.secondarySystemGroupedBackground),
+                                    fallbackStroke: Color(.separator).opacity(0.4)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .frame(minHeight: 44)
+                        .disabled(isDisabled || isSending)
+                        .accessibilityLabel("\(cmd.title), \(cmd.command)")
+                        .accessibilityHint(cmd.autoSend ? "Runs immediately on remote host." : "Inserts command into composer.")
                     }
-                    .buttonStyle(.plain)
-                    .frame(minHeight: 44)
-                    .disabled(isDisabled || isSending)
-                    .accessibilityLabel("\(cmd.title), \(cmd.command)")
-                    .accessibilityHint(cmd.autoSend ? "Runs immediately on remote host." : "Inserts command into composer.")
                 }
+                .padding(.horizontal, 12)
             }
-            .padding(.horizontal, 12)
         }
     }
 }

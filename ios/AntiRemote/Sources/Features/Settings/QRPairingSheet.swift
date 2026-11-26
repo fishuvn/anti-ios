@@ -48,7 +48,7 @@ struct QRPairingSheet: View {
                             }
                             .frame(maxWidth: .infinity, minHeight: 44)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .adaptiveGlassProminentButton()
                         .disabled(isClaiming || manualURI.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                     .padding(.horizontal)
@@ -104,7 +104,7 @@ struct QRPairingSheet: View {
                         cameraStatus = granted ? .authorized : .denied
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .adaptiveGlassProminentButton()
                 .frame(minHeight: 44)
             }
             .padding(20)

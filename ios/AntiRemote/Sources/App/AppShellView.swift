@@ -20,6 +20,7 @@ struct AppShellView: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
+        .adaptiveTabBarMinimizeOnScroll()
         .onChange(of: selectedTab) { _, _ in
             HapticManager.shared.fire(.selection, enabled: connection.hapticsEnabled)
         }

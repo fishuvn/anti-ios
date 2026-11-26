@@ -34,12 +34,12 @@ struct ChatTabView: View {
                         Button("Retry") {
                             connection.reconnect()
                         }
-                        .buttonStyle(.borderedProminent)
+                        .adaptiveGlassProminentButton()
 
                         Button("Switch Host") {
                             router.presentedSheet = .hostSwitcher
                         }
-                        .buttonStyle(.bordered)
+                        .adaptiveGlassButton()
                     }
 
                 case .loaded:
@@ -47,6 +47,13 @@ struct ChatTabView: View {
                 }
             }
             .background(Color(.systemGroupedBackground))
+            .adaptiveTopSafeAreaBar {
+                if chat.state == .loaded, let ws = workspace.activeWorkspace {
+                    workspaceContextStrip(ws)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                }
+            }
             .safeAreaInset(edge: .bottom) {
                 ComposerBarView(
                     text: $bindableChat.composerText,
@@ -152,7 +159,7 @@ struct ChatTabView: View {
                     }
                 }
 
-                if let ws = workspace.activeWorkspace {
+                if !AdaptiveInterfaceStyle.isLiquidGlassActive, let ws = workspace.activeWorkspace {
                     workspaceContextStrip(ws)
                 }
 
@@ -213,7 +220,11 @@ struct ChatTabView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .adaptiveGlassSurface(
+            in: Capsule(),
+            interactive: false,
+            fallbackBackground: Color(.secondarySystemGroupedBackground)
+        )
         .accessibilityElement(children: .combine)
     }
 

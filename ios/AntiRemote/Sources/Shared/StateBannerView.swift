@@ -19,17 +19,19 @@ struct ErrorBannerView: View {
             if let onRetry {
                 Button(retryTitle, action: onRetry)
                     .font(.footnote.weight(.semibold))
-                    .buttonStyle(.bordered)
+                    .adaptiveGlassButton()
                     .controlSize(.small)
                     .frame(minHeight: 44)
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.red.opacity(0.35), lineWidth: 1)
+        .adaptiveGlassSurface(
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous),
+            tint: Color.red.opacity(0.16),
+            interactive: false,
+            fallbackBackground: Color(.secondarySystemGroupedBackground),
+            fallbackStroke: Color.red.opacity(0.35)
         )
         .accessibilityElement(children: .contain)
     }

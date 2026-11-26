@@ -17,7 +17,10 @@ AntiRemote is a native iOS 18+ SwiftUI application built strictly on Apple Human
 - **Text**: `.primary`, `.secondary`, `.tertiary` (automatic Light, Dark, and Increased Contrast compliance ≥4.5:1).
 - **Single Interactive Tint**: `AccentColor` asset — deep cobalt indigo (`#1D4ED8` light / `#60A5FA` dark, high-contrast variants `#1E3A8A` / `#93C5FD`) driving interactive buttons, active tab, and focus states.
 - **Semantic Status Colors**: System `.green` (connected / running / added diff), `.orange` (connecting / modified / ask policy), `.red` (disconnected / failed / destructive / removed diff), `.secondary` (idle / stopped). Status is NEVER conveyed by color alone — always paired with SF Symbol + text label.
-- **Materials**: `.bar` and `.ultraThinMaterial` for bottom composer bar and pinned status chrome only.
+- **Materials & Adaptive Liquid Glass (iOS 26+ / iOS 18 Fallback)**:
+  - Built against the iOS 26 SDK with `deploymentTarget: 18.0` via `AdaptiveGlass.swift` (`#if compiler(>=6.2)` + `if #available(iOS 26.0, *)`).
+  - **On iOS 26+**: Native floating Liquid Glass `TabView` (`.tabBarMinimizeBehavior(.onScrollDown)`), `GlassEffectContainer` floating composer & slash-command pill deck (`.glassEffect(.regular.interactive(), in: ...)`), floating `safeAreaBar(edge: .top)` workspace pill, Liquid Glass host switcher pill, and `.buttonStyle(.glass)` / `.buttonStyle(.glassProminent)` control clusters. Content surfaces (messages, lists, code, diffs) remain solid semantic surfaces for contrast.
+  - **On iOS 18–25**: Standard Apple HIG translucent `.bar` composer with hairline divider, persistent bottom tab bar, semantic `secondarySystemFill` / `secondarySystemGroupedBackground` surfaces, and `.bordered` / `.borderedProminent` buttons.
 
 ## Typography & Dynamic Type
 

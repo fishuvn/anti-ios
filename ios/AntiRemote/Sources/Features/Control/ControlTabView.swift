@@ -106,7 +106,7 @@ struct ControlTabView: View {
                     Button("Reconnect") {
                         connection.reconnect()
                     }
-                    .buttonStyle(.borderedProminent)
+                    .adaptiveGlassProminentButton()
                 }
                 .padding(.vertical, 4)
             } else {
@@ -137,12 +137,14 @@ struct ControlTabView: View {
                 }
                 .padding(.vertical, 2)
 
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 10) {
-                        daemonActionButtons(state: daemon.state)
-                    }
-                    VStack(spacing: 10) {
-                        daemonActionButtons(state: daemon.state)
+                AdaptiveGlassGroup(spacing: 10) {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 10) {
+                            daemonActionButtons(state: daemon.state)
+                        }
+                        VStack(spacing: 10) {
+                            daemonActionButtons(state: daemon.state)
+                        }
                     }
                 }
                 .padding(.vertical, 4)
@@ -166,7 +168,7 @@ struct ControlTabView: View {
             Label("Start", systemImage: "play.fill")
                 .frame(maxWidth: .infinity, minHeight: 36)
         }
-        .buttonStyle(.borderedProminent)
+        .adaptiveGlassProminentButton()
         .disabled(control.isDaemonBusy || state == .running)
 
         Button(role: .destructive) {
@@ -175,7 +177,7 @@ struct ControlTabView: View {
             Label("Stop", systemImage: "stop.fill")
                 .frame(maxWidth: .infinity, minHeight: 36)
         }
-        .buttonStyle(.bordered)
+        .adaptiveGlassButton()
         .disabled(control.isDaemonBusy || state == .stopped)
 
         Button {
@@ -184,7 +186,7 @@ struct ControlTabView: View {
             Label("Check", systemImage: "arrow.clockwise")
                 .frame(maxWidth: .infinity, minHeight: 36)
         }
-        .buttonStyle(.bordered)
+        .adaptiveGlassButton()
         .disabled(control.isDaemonBusy)
     }
 

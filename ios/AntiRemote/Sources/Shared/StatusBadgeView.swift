@@ -19,7 +19,11 @@ struct ConnectionStatusPill: View {
             }
             .padding(.horizontal, 10)
             .frame(minHeight: 36)
-            .background(Color(.secondarySystemFill), in: Capsule())
+            .adaptiveGlassSurface(
+                in: Capsule(),
+                interactive: true,
+                fallbackBackground: Color(.secondarySystemFill)
+            )
         }
         .buttonStyle(.plain)
         .frame(minWidth: 44, minHeight: 44)

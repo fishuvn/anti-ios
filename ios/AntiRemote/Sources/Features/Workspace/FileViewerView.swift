@@ -27,7 +27,7 @@ struct FileViewerView: View {
                     Button("Retry") {
                         Task { await load() }
                     }
-                    .buttonStyle(.borderedProminent)
+                    .adaptiveGlassProminentButton()
                 }
             } else if let preview {
                 if preview.isBinary {

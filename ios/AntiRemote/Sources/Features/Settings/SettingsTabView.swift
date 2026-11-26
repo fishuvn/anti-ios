@@ -182,6 +182,7 @@ struct SettingsTabView: View {
 
             Section("App Preferences") {
                 Toggle("Haptic Feedback", isOn: $bindableConn.hapticsEnabled)
+                LabeledContent("Interface", value: AdaptiveInterfaceStyle.displayName)
                 LabeledContent("Connection", value: connection.connectionState.label)
                 Button("Reconnect Now") {
                     connection.reconnect()

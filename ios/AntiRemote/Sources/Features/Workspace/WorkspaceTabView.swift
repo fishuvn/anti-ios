@@ -25,7 +25,7 @@ struct WorkspaceTabView: View {
                     Button("Reload") {
                         Task { await workspace.loadWorkspaces(using: connection.makeClient()) }
                     }
-                    .buttonStyle(.borderedProminent)
+                    .adaptiveGlassProminentButton()
                 }
             } else {
                 List {
