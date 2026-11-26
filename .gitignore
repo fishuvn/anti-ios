@@ -1,0 +1,24 @@
+# macOS & Xcode
+.DS_Store
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+DerivedData/
+build/
+.swiftpm/
+ios/AntiRemote.xcodeproj/
+
+# Node & Bridge runtime
+node_modules/
+bridge/.bridge-state/
+bridge/*.pem
+bridge/*.key
+bridge/*.crt
+*.log
+
+# Impeccable runtime scratch
+.impeccable/questions/
+.impeccable/mocks/
+.impeccable/review/
+.impeccable/config.local.json
