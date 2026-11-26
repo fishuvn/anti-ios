@@ -1,0 +1,300 @@
+name: Build iOS IPA & Auto Release (VI)
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Phiên bản tăng tự động (auto / patch / minor / major)'
+        required: false
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+      custom_tag:
+        description: 'Tag tuỳ chỉnh (ví dụ v1.2.0, để trống để tự tính)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-ipa-release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  bridge-test:
+    name: Test Bridge Daemon & Changelog Script
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Run Bridge E2E test suite
+        working-directory: bridge
+        run: npm test
+
+      - name: Validate Vietnamese changelog generator
+        run: node .github/scripts/generate-vi-changelog.mjs --dry-run > /dev/null
+
+  build-ipa:
+    name: Test AntiCore & Build iOS IPA
+    needs: [bridge-test]
+    runs-on: macos-15
+    timeout-minutes: 30
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+      signing_mode: ${{ steps.build.outputs.signing_mode }}
+      ipa_name: ${{ steps.build.outputs.ipa_name }}
+      sha256: ${{ steps.build.outputs.sha256 }}
+    steps:
+      - name: Checkout repository (full history)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Select latest Xcode 16+
+        run: |
+          XCODE_APP=$(ls -d /Applications/Xcode_16*.app /Applications/Xcode.app 2>/dev/null | sort -V | tail -n 1)
+          if [ -n "$XCODE_APP" ]; then
+            sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          fi
+          xcodebuild -version
+          swift --version
+
+      - name: Compute next semantic version
+        id: version
+        env:
+          INPUT_BUMP: ${{ inputs.bump || 'auto' }}
+          INPUT_TAG: ${{ inputs.custom_tag || '' }}
+        run: |
+          EXPLICIT_TAG="$INPUT_TAG"
+          if [ -z "$EXPLICIT_TAG" ] && [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            EXPLICIT_TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          if [ -n "$EXPLICIT_TAG" ]; then
+            node .github/scripts/generate-vi-changelog.mjs \
+              --tag "$EXPLICIT_TAG" \
+              --github-output "$GITHUB_OUTPUT" \
+              --dry-run > /dev/null
+          else
+            node .github/scripts/generate-vi-changelog.mjs \
+              --bump "$INPUT_BUMP" \
+              --github-output "$GITHUB_OUTPUT" \
+              --dry-run > /dev/null
+          fi
+
+      - name: Run AntiCore Swift Testing unit tests
+        working-directory: ios/Packages/AntiCore
+        run: swift test
+
+      - name: Install XcodeGen
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+          xcodegen --version
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build iOS IPA (Signed if Apple secrets set, else Unsigned Sideload IPA)
+        id: build
+        working-directory: ios
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          MARKETING_VER: ${{ steps.version.outputs.version }}
+          BUILD_NUM: ${{ github.run_number }}
+          APPLE_CERT_BASE64: ${{ secrets.APPLE_CERT_BASE64 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_EXPORT_METHOD: ${{ vars.APPLE_EXPORT_METHOD || 'ad-hoc' }}
+        run: |
+          set -euo pipefail
+          mkdir -p ../dist
+
+          if [ -n "$APPLE_CERT_BASE64" ] && [ -n "$APPLE_PROVISIONING_PROFILE_BASE64" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            echo "Building SIGNED IPA..."
+            SIGNING_MODE="signed"
+            KEYCHAIN_PATH="$RUNNER_TEMP/antiremote-build.keychain-db"
+            KEYCHAIN_PASS="$(uuidgen)"
+            CERT_PATH="$RUNNER_TEMP/cert.p12"
+            PROFILE_PATH="$RUNNER_TEMP/profile.mobileprovision"
+
+            echo "$APPLE_CERT_BASE64" | base64 --decode > "$CERT_PATH"
+            echo "$APPLE_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
+
+            security create-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+            security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+            security unlock-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+            security import "$CERT_PATH" -P "$APPLE_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+            security list-keychain -d user -s "$KEYCHAIN_PATH"
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
+
+            PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< "$(security cms -D -i "$PROFILE_PATH")")
+            mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+            cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
+
+            xcodebuild archive \
+              -project AntiRemote.xcodeproj \
+              -scheme AntiRemote \
+              -configuration Release \
+              -sdk iphoneos \
+              -destination 'generic/platform=iOS' \
+              -archivePath build/AntiRemote.xcarchive \
+              MARKETING_VERSION="$MARKETING_VER" \
+              CURRENT_PROJECT_VERSION="$BUILD_NUM" \
+              DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+              CODE_SIGN_STYLE=Manual \
+              PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID"
+
+            cat > build/ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>${APPLE_EXPORT_METHOD}</string>
+            <key>teamID</key>
+            <string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+          </dict>
+          </plist>
+          EOF
+
+            xcodebuild -exportArchive \
+              -archivePath build/AntiRemote.xcarchive \
+              -exportOptionsPlist build/ExportOptions.plist \
+              -exportPath build/export
+
+            EXPORTED_IPA=$(find build/export -maxdepth 2 -name '*.ipa' | head -n 1)
+            IPA_NAME="AntiRemote-${RELEASE_TAG}-signed.ipa"
+            cp "$EXPORTED_IPA" "../dist/${IPA_NAME}"
+          else
+            echo "Apple signing secrets not configured — building UNSIGNED sideload-ready IPA..."
+            SIGNING_MODE="unsigned"
+
+            xcodebuild build \
+              -project AntiRemote.xcodeproj \
+              -scheme AntiRemote \
+              -configuration Release \
+              -sdk iphoneos \
+              -destination 'generic/platform=iOS' \
+              -derivedDataPath build/DerivedData \
+              MARKETING_VERSION="$MARKETING_VER" \
+              CURRENT_PROJECT_VERSION="$BUILD_NUM" \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              DEVELOPMENT_TEAM=""
+
+            APP_PATH="build/DerivedData/Build/Products/Release-iphoneos/AntiRemote.app"
+            test -d "$APP_PATH"
+            rm -rf build/Payload && mkdir -p build/Payload
+            cp -R "$APP_PATH" build/Payload/AntiRemote.app
+
+            IPA_NAME="AntiRemote-${RELEASE_TAG}-unsigned.ipa"
+            (cd build && ditto -c -k --sequesterRsrc --keepParent Payload "../../dist/${IPA_NAME}")
+          fi
+
+          # Verify IPA structure & compute SHA-256 checksum
+          unzip -l "../dist/${IPA_NAME}" | grep -q "Payload/AntiRemote.app/Info.plist"
+          SHA256=$(shasum -a 256 "../dist/${IPA_NAME}" | awk '{print $1}')
+          echo "${SHA256}  ${IPA_NAME}" > "../dist/${IPA_NAME}.sha256"
+
+          echo "signing_mode=${SIGNING_MODE}" >> "$GITHUB_OUTPUT"
+          echo "ipa_name=${IPA_NAME}" >> "$GITHUB_OUTPUT"
+          echo "sha256=${SHA256}" >> "$GITHUB_OUTPUT"
+
+      - name: Clean up temporary signing keychain
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/antiremote-build.keychain-db" ]; then
+            security delete-keychain "$RUNNER_TEMP/antiremote-build.keychain-db" || true
+          fi
+          rm -f "$RUNNER_TEMP/cert.p12" "$RUNNER_TEMP/profile.mobileprovision"
+
+      - name: Generate Vietnamese changelog for release
+        run: |
+          node .github/scripts/generate-vi-changelog.mjs \
+            --tag "${{ steps.version.outputs.tag }}" \
+            --signing "${{ steps.build.outputs.signing_mode }}" \
+            --ipa-name "${{ steps.build.outputs.ipa_name }}" \
+            --sha256 "${{ steps.build.outputs.sha256 }}" \
+            --out dist/release-notes-vi.md
+          cat dist/release-notes-vi.md
+
+      - name: Upload IPA & Vietnamese release notes artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: AntiRemote-${{ steps.version.outputs.tag }}-ipa
+          path: dist/
+          retention-days: 30
+
+  release:
+    name: Publish GitHub Release (Changelog Tiếng Việt)
+    needs: [build-ipa]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download built IPA artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: AntiRemote-${{ needs.build-ipa.outputs.tag }}-ipa
+          path: dist
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.build-ipa.outputs.tag }}
+          IPA_NAME: ${{ needs.build-ipa.outputs.ipa_name }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
+              --title "AntiRemote ${RELEASE_TAG}" \
+              --notes-file dist/release-notes-vi.md
+            gh release upload "$RELEASE_TAG" \
+              "dist/${IPA_NAME}" \
+              "dist/${IPA_NAME}.sha256" \
+              --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              "dist/${IPA_NAME}" \
+              "dist/${IPA_NAME}.sha256" \
+              --target "$GITHUB_SHA" \
+              --title "AntiRemote ${RELEASE_TAG}" \
+              --notes-file dist/release-notes-vi.md
+          fi
