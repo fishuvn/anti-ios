@@ -1,0 +1,78 @@
+name: AntiRemote
+options:
+  bundleIdPrefix: com.antiremote
+  deploymentTarget:
+    iOS: "18.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+
+packages:
+  AntiCore:
+    path: Packages/AntiCore
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEVELOPMENT_ASSET_PATHS: ""
+
+targets:
+  AntiRemote:
+    type: application
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: AntiRemote/Sources
+      - path: AntiRemote/Resources/Assets.xcassets
+    info:
+      path: AntiRemote/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: AntiRemote
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        UILaunchScreen:
+          UIColorName: ""
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSCameraUsageDescription: "AntiRemote uses the camera to scan the QR pairing code shown by your remote Antigravity bridge."
+        NSLocalNetworkUsageDescription: "AntiRemote connects to your Antigravity bridge running on your local network or Tailscale."
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        CFBundleURLTypes:
+          - CFBundleURLName: com.antiremote.pair
+            CFBundleURLSchemes:
+              - antiremote
+    dependencies:
+      - package: AntiCore
+        product: AntiCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.antiremote.ios
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: NO
+        SWIFT_EMIT_LOC_STRINGS: YES
+
+schemes:
+  AntiRemote:
+    build:
+      targets:
+        AntiRemote: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      testPlans: []
