@@ -112,6 +112,7 @@ struct AppShellView: View {
 
         // Maintain live WebSocket event stream with bounded exponential backoff
         var attempt = 0
+        var hasConnectedOnce = false
         while !Task.isCancelled {
             do {
                 let stream = client.streamEvents()
@@ -121,8 +122,15 @@ struct AppShellView: View {
                     control.handleStreamEvent(event)
                     if case .daemonUpdated(let daemon) = event {
                         connection.applyDaemonUpdate(daemon)
-                    } else if case .connected(_, let daemon) = event, let daemon {
-                        connection.applyDaemonUpdate(daemon)
+                    } else if case .connected(_, let daemon) = event {
+                        if let daemon {
+                            connection.applyDaemonUpdate(daemon)
+                        }
+                        if hasConnectedOnce {
+                            await chat.reloadActiveSession(using: client)
+                            await control.refreshRuns(using: client)
+                        }
+                        hasConnectedOnce = true
                     }
                 }
             } catch is CancellationError {

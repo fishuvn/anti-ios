@@ -220,15 +220,15 @@ final class ConnectionStore {
 
     func updateRemoteSettings(
         using client: BridgeClient,
-        modelProvider: String? = nil,
-        permissionMode: String? = nil
+        selectedModel: String? = nil,
+        agentMode: String? = nil
     ) async {
         isUpdatingSettings = true
         settingsError = nil
         defer { isUpdatingSettings = false }
         do {
             let updated = try await client.updateSettings(
-                RemoteSettingsPatch(modelProvider: modelProvider, permissionMode: permissionMode)
+                RemoteSettingsPatch(selectedModel: selectedModel, agentMode: agentMode)
             )
             remoteSettings = updated
             if let current = hostStatus {

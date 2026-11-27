@@ -545,9 +545,25 @@ public struct MCPServerSummary: Sendable, Codable, Identifiable, Equatable, Hash
     }
 }
 
+public struct ModelOption: Sendable, Codable, Identifiable, Equatable, Hashable {
+    public let id: String
+    public let label: String
+
+    public init(id: String, label: String) {
+        self.id = id
+        self.label = label
+    }
+}
+
 public struct RemoteSettings: Sendable, Codable, Equatable {
     public let modelProvider: String
     public let permissionMode: String
+    public let selectedModel: String
+    public let cliDefaultModel: String?
+    public let availableModels: [ModelOption]
+    public let agentMode: String
+    public let cliAgentMode: String?
+    public let readOnlyCliConfig: Bool
     public let trustedWorkspaces: [String]
     public let mcpServers: [MCPServerSummary]
     public let configPath: String
@@ -555,25 +571,66 @@ public struct RemoteSettings: Sendable, Codable, Equatable {
     public init(
         modelProvider: String,
         permissionMode: String,
+        selectedModel: String = "default",
+        cliDefaultModel: String? = nil,
+        availableModels: [ModelOption] = [],
+        agentMode: String = "default",
+        cliAgentMode: String? = nil,
+        readOnlyCliConfig: Bool = true,
         trustedWorkspaces: [String],
         mcpServers: [MCPServerSummary],
         configPath: String
     ) {
         self.modelProvider = modelProvider
         self.permissionMode = permissionMode
+        self.selectedModel = selectedModel
+        self.cliDefaultModel = cliDefaultModel
+        self.availableModels = availableModels
+        self.agentMode = agentMode
+        self.cliAgentMode = cliAgentMode
+        self.readOnlyCliConfig = readOnlyCliConfig
         self.trustedWorkspaces = trustedWorkspaces
         self.mcpServers = mcpServers
         self.configPath = configPath
+    }
+
+    public enum CodingKeys: String, CodingKey {
+        case modelProvider, permissionMode, selectedModel, cliDefaultModel, availableModels
+        case agentMode, cliAgentMode, readOnlyCliConfig, trustedWorkspaces, mcpServers, configPath
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        modelProvider = try c.decodeIfPresent(String.self, forKey: .modelProvider) ?? "default"
+        permissionMode = try c.decodeIfPresent(String.self, forKey: .permissionMode) ?? "default"
+        selectedModel = try c.decodeIfPresent(String.self, forKey: .selectedModel) ?? "default"
+        cliDefaultModel = try c.decodeIfPresent(String.self, forKey: .cliDefaultModel)
+        availableModels = try c.decodeIfPresent([ModelOption].self, forKey: .availableModels) ?? []
+        agentMode = try c.decodeIfPresent(String.self, forKey: .agentMode) ?? "default"
+        cliAgentMode = try c.decodeIfPresent(String.self, forKey: .cliAgentMode)
+        readOnlyCliConfig = try c.decodeIfPresent(Bool.self, forKey: .readOnlyCliConfig) ?? true
+        trustedWorkspaces = try c.decodeIfPresent([String].self, forKey: .trustedWorkspaces) ?? []
+        mcpServers = try c.decodeIfPresent([MCPServerSummary].self, forKey: .mcpServers) ?? []
+        configPath = try c.decodeIfPresent(String.self, forKey: .configPath) ?? ""
     }
 }
 
 public struct RemoteSettingsPatch: Sendable, Codable, Equatable {
     public var modelProvider: String?
     public var permissionMode: String?
+    public var selectedModel: String?
+    public var agentMode: String?
 
-    public init(modelProvider: String? = nil, permissionMode: String? = nil) {
+    public init(
+        modelProvider: String? = nil,
+        permissionMode: String? = nil,
+        selectedModel: String? = nil,
+        agentMode: String? = nil
+    ) {
         self.modelProvider = modelProvider
         self.permissionMode = permissionMode
+        self.selectedModel = selectedModel
+        self.agentMode = agentMode
     }
 }
 

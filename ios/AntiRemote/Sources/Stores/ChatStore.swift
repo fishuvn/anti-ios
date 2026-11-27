@@ -62,6 +62,25 @@ final class ChatStore {
         }
     }
 
+    func reloadActiveSession(using client: BridgeClient) async {
+        guard let id = activeSession?.id else { return }
+        do {
+            async let detailTask = client.sessionDetail(id)
+            async let listTask = client.sessions()
+            let (detail, loadedSessions) = try await (detailTask, listTask)
+            guard !Task.isCancelled else { return }
+            sessions = loadedSessions
+            if activeSession?.id == detail.id {
+                activeSession = detail
+                activeRunID = loadedSessions.first(where: { $0.id == detail.id })?.activeRunId
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            Self.logger.error("Active session sync failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
     func selectSession(_ id: String, using client: BridgeClient) async {
         errorMessage = nil
         do {
@@ -160,17 +179,24 @@ final class ChatStore {
 
             HapticManager.shared.fire(.lightImpact, enabled: hapticsEnabled)
             let response = try await client.sendMessage(sessionID, trimmed, slashCommand, workspaceID)
-            activeRunID = response.runId
 
             if var current = activeSession, current.id == response.sessionId {
                 if !current.messages.contains(where: { $0.id == response.userMessage.id }) {
                     current.messages.append(response.userMessage)
                 }
-                if !current.messages.contains(where: { $0.id == response.assistantMessage.id }) {
+                if let existingIdx = current.messages.firstIndex(where: { $0.id == response.assistantMessage.id }) {
+                    // WebSocket deltas or completion may have already arrived before the HTTP 202 returned.
+                    if current.messages[existingIdx].status == .streaming {
+                        activeRunID = response.runId
+                    }
+                } else {
                     current.messages.append(response.assistantMessage)
+                    activeRunID = response.runId
                 }
                 current.updatedAt = Date()
                 activeSession = current
+            } else {
+                activeRunID = response.runId
             }
             sessions = (try? await client.sessions()) ?? sessions
         } catch {
@@ -210,13 +236,17 @@ final class ChatStore {
             activeSession = session
 
         case .toolEvent(_, let sessionID, let messageID, let tool):
-            guard var session = activeSession, session.id == sessionID,
-                  let idx = session.messages.firstIndex(where: { $0.id == messageID })
-            else { return }
-            if let tIdx = session.messages[idx].toolEvents.firstIndex(where: { $0.id == tool.id }) {
-                session.messages[idx].toolEvents[tIdx] = tool
+            guard var session = activeSession, session.id == sessionID else { return }
+            if let idx = session.messages.firstIndex(where: { $0.id == messageID }) {
+                if let tIdx = session.messages[idx].toolEvents.firstIndex(where: { $0.id == tool.id }) {
+                    session.messages[idx].toolEvents[tIdx] = tool
+                } else {
+                    session.messages[idx].toolEvents.append(tool)
+                }
             } else {
-                session.messages[idx].toolEvents.append(tool)
+                session.messages.append(
+                    ChatMessage(id: messageID, role: .assistant, content: "", status: .streaming, toolEvents: [tool])
+                )
             }
             activeSession = session
 
@@ -231,6 +261,12 @@ final class ChatStore {
                 } else {
                     session.messages[idx].status = .completed
                 }
+            } else if let message {
+                session.messages.append(message)
+            } else {
+                session.messages.append(
+                    ChatMessage(id: messageID, role: .assistant, content: "", status: .completed)
+                )
             }
             session.updatedAt = Date()
             activeSession = session
@@ -240,12 +276,16 @@ final class ChatStore {
                 activeRunID = nil
             }
             errorMessage = error
-            guard var session = activeSession, session.id == sessionID,
-                  let idx = session.messages.firstIndex(where: { $0.id == messageID })
-            else { return }
-            session.messages[idx].status = .failed
-            if session.messages[idx].content.isEmpty {
-                session.messages[idx].content = "Error: \(error)"
+            guard var session = activeSession, session.id == sessionID else { return }
+            if let idx = session.messages.firstIndex(where: { $0.id == messageID }) {
+                session.messages[idx].status = .failed
+                if session.messages[idx].content.isEmpty {
+                    session.messages[idx].content = "Error: \(error)"
+                }
+            } else {
+                session.messages.append(
+                    ChatMessage(id: messageID, role: .assistant, content: "Error: \(error)", status: .failed)
+                )
             }
             activeSession = session
 
@@ -253,10 +293,14 @@ final class ChatStore {
             if activeRunID == runID {
                 activeRunID = nil
             }
-            guard var session = activeSession, session.id == sessionID,
-                  let idx = session.messages.firstIndex(where: { $0.id == messageID })
-            else { return }
-            session.messages[idx].status = .cancelled
+            guard var session = activeSession, session.id == sessionID else { return }
+            if let idx = session.messages.firstIndex(where: { $0.id == messageID }) {
+                session.messages[idx].status = .cancelled
+            } else {
+                session.messages.append(
+                    ChatMessage(id: messageID, role: .assistant, content: "[Cancelled]", status: .cancelled)
+                )
+            }
             activeSession = session
 
         case .connected, .daemonUpdated, .pong, .unknown:

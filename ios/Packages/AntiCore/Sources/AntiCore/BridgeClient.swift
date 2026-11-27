@@ -335,8 +335,18 @@ private actor DemoBackendState {
         updatedAt: Date()
     )
     var settings = RemoteSettings(
-        modelProvider: "gemini",
-        permissionMode: "ask",
+        modelProvider: "default",
+        permissionMode: "plan",
+        selectedModel: "default",
+        cliDefaultModel: "gemini-4-neon-high",
+        availableModels: [
+            ModelOption(id: "gemini-4-neon-high", label: "Gemini 4 Neon (High)"),
+            ModelOption(id: "gemini-3.8-flash-high", label: "Gemini 3.8 Flash (High)"),
+            ModelOption(id: "claude-opus-5-5-high", label: "Claude Opus 5.5 (High)"),
+        ],
+        agentMode: "default",
+        cliAgentMode: "plan",
+        readOnlyCliConfig: true,
         trustedWorkspaces: ["/srv/antigravity/anti-ios", "/srv/antigravity/api-gateway"],
         mcpServers: [
             MCPServerSummary(name: "graphify", transport: "stdio", target: "graphify-mcp", enabled: true),
@@ -638,9 +648,17 @@ private actor DemoBackendState {
     }
 
     func updateSettings(_ patch: RemoteSettingsPatch) -> RemoteSettings {
+        let nextModel = patch.selectedModel ?? settings.selectedModel
+        let nextMode = patch.agentMode ?? settings.agentMode
         settings = RemoteSettings(
-            modelProvider: patch.modelProvider ?? settings.modelProvider,
-            permissionMode: patch.permissionMode ?? settings.permissionMode,
+            modelProvider: patch.modelProvider ?? (nextModel == "default" ? (settings.cliDefaultModel ?? "default") : nextModel),
+            permissionMode: patch.permissionMode ?? (nextMode == "default" ? (settings.cliAgentMode ?? "default") : nextMode),
+            selectedModel: nextModel,
+            cliDefaultModel: settings.cliDefaultModel,
+            availableModels: settings.availableModels,
+            agentMode: nextMode,
+            cliAgentMode: settings.cliAgentMode,
+            readOnlyCliConfig: settings.readOnlyCliConfig,
             trustedWorkspaces: settings.trustedWorkspaces,
             mcpServers: settings.mcpServers,
             configPath: settings.configPath

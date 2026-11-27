@@ -8,8 +8,12 @@ struct SettingsTabView: View {
 
     @State private var hostToDelete: HostProfile?
 
-    private let modelProviders = ["gemini", "vertex", "anthropic", "openai-compatible", "default"]
-    private let permissionModes = ["ask", "allow-read", "strict"]
+    private let agentModes: [(id: String, label: String)] = [
+        ("default", "Inherit CLI Default"),
+        ("plan", "Plan (Read-Only)"),
+        ("accept-edits", "Accept Edits"),
+        ("auto", "Auto"),
+    ]
 
     var body: some View {
         @Bindable var bindableConn = connection
@@ -100,38 +104,50 @@ struct SettingsTabView: View {
             if let settings = connection.remoteSettings {
                 Section {
                     Picker(
-                        "Model Provider",
+                        "Model Override",
                         selection: Binding(
-                            get: { settings.modelProvider },
+                            get: { settings.selectedModel },
                             set: { newVal in
+                                guard newVal != settings.selectedModel else { return }
                                 let client = connection.makeClient()
-                                Task { await connection.updateRemoteSettings(using: client, modelProvider: newVal) }
+                                Task { await connection.updateRemoteSettings(using: client, selectedModel: newVal) }
                             }
                         )
                     ) {
-                        ForEach(modelProviders, id: \.self) { provider in
-                            Text(provider).tag(provider)
+                        Text(settings.cliDefaultModel.map { "Inherit CLI (\($0))" } ?? "Inherit CLI Default")
+                            .tag("default")
+                        ForEach(settings.availableModels) { model in
+                            Text(model.label).tag(model.id)
+                        }
+                        if settings.selectedModel != "default",
+                           !settings.availableModels.contains(where: { $0.id == settings.selectedModel }) {
+                            Text(settings.selectedModel).tag(settings.selectedModel)
                         }
                     }
                     .disabled(connection.isUpdatingSettings)
 
                     Picker(
-                        "Permission Policy",
+                        "Agent Mode",
                         selection: Binding(
-                            get: { settings.permissionMode },
+                            get: { settings.agentMode },
                             set: { newVal in
+                                guard newVal != settings.agentMode else { return }
                                 let client = connection.makeClient()
-                                Task { await connection.updateRemoteSettings(using: client, permissionMode: newVal) }
+                                Task { await connection.updateRemoteSettings(using: client, agentMode: newVal) }
                             }
                         )
                     ) {
-                        ForEach(permissionModes, id: \.self) { mode in
-                            Text(mode).tag(mode)
+                        ForEach(agentModes, id: \.id) { mode in
+                            if mode.id == "default", let cliMode = settings.cliAgentMode {
+                                Text("Inherit CLI (\(cliMode))").tag(mode.id)
+                            } else {
+                                Text(mode.label).tag(mode.id)
+                            }
                         }
                     }
                     .disabled(connection.isUpdatingSettings)
 
-                    LabeledContent("Config Path") {
+                    LabeledContent("CLI Config (Read-Only)") {
                         Text(settings.configPath)
                             .font(.caption.monospaced())
                             .foregroundStyle(.secondary)
@@ -139,9 +155,9 @@ struct SettingsTabView: View {
                             .truncationMode(.middle)
                     }
                 } header: {
-                    Text("Antigravity CLI Settings")
+                    Text("Remote Run Overrides")
                 } footer: {
-                    Text("Syncs validated fields with ~/.gemini/antigravity-cli/settings.json on the remote host.")
+                    Text("Overrides apply per remote run via --model / --mode. AntiBridge never modifies ~/.gemini/antigravity-cli/settings.json.")
                 }
 
                 Section("MCP Servers (\(settings.mcpServers.count))") {

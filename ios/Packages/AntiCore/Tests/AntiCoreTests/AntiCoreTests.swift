@@ -100,4 +100,46 @@ struct AntiCoreTests {
         #expect(events.contains(where: { if case .messageDelta = $0 { return true }; return false }))
         #expect(events.contains(where: { if case .runCompleted = $0 { return true }; return false }))
     }
+
+    @Test("Decodes both legacy and v1.2 RemoteSettings payloads safely")
+    func decodesLegacyAndModernRemoteSettings() throws {
+        let legacyJSON = """
+        {
+          "modelProvider": "gemini",
+          "permissionMode": "ask",
+          "trustedWorkspaces": ["/srv/app"],
+          "mcpServers": [],
+          "configPath": "~/.gemini/antigravity-cli/settings.json"
+        }
+        """
+        let legacy = try BridgeJSON.decoder.decode(RemoteSettings.self, from: Data(legacyJSON.utf8))
+        #expect(legacy.selectedModel == "default")
+        #expect(legacy.agentMode == "default")
+        #expect(legacy.availableModels.isEmpty)
+        #expect(legacy.readOnlyCliConfig)
+
+        let modernJSON = """
+        {
+          "modelProvider": "gemini-4-neon-high",
+          "permissionMode": "accept-edits",
+          "selectedModel": "gemini-4-neon-high",
+          "cliDefaultModel": "gemini-3.8-flash-high",
+          "availableModels": [
+            { "id": "gemini-4-neon-high", "label": "Gemini 4 Neon (High)" }
+          ],
+          "agentMode": "accept-edits",
+          "cliAgentMode": "plan",
+          "readOnlyCliConfig": true,
+          "trustedWorkspaces": ["/srv/app"],
+          "mcpServers": [],
+          "configPath": "~/.gemini/antigravity-cli/settings.json"
+        }
+        """
+        let modern = try BridgeJSON.decoder.decode(RemoteSettings.self, from: Data(modernJSON.utf8))
+        #expect(modern.selectedModel == "gemini-4-neon-high")
+        #expect(modern.cliDefaultModel == "gemini-3.8-flash-high")
+        #expect(modern.availableModels.count == 1)
+        #expect(modern.agentMode == "accept-edits")
+        #expect(modern.cliAgentMode == "plan")
+    }
 }

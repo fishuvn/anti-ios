@@ -16,7 +16,7 @@
     </a>
     <img src="https://img.shields.io/badge/Swift-6.2-F05138?style=flat-square&logo=swift&logoColor=white" alt="Swift 6.2" />
     <img src="https://img.shields.io/badge/SwiftUI-iOS%2018%2B%20%7C%20iOS%2026%20Liquid%20Glass-0A84FF?style=flat-square&logo=apple&logoColor=white" alt="SwiftUI iOS 18+ and iOS 26 Liquid Glass" />
-    <img src="https://img.shields.io/badge/JavaScript-Node.js%2020%2B%20ESM-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="JavaScript Node.js 20+ ESM" />
+    <img src="https://img.shields.io/badge/Bridge-Rust%20%2B%20Tauri%20v2%20(anti--bridge)-DEA584?style=flat-square&logo=rust&logoColor=black" alt="Rust Tauri v2 Companion Bridge" />
     <img src="https://img.shields.io/github/languages/top/fishuvn/anti-ios?style=flat-square&color=F05138" alt="Top Language" />
   </p>
 </div>
@@ -31,7 +31,7 @@ Control your remote Google Antigravity backend (`agy`) from iPhone with Apple HI
 | :--- | :--- | :--- | :--- |
 | **iOS App (`ios/AntiRemote`)** | **Swift 6.2** | SwiftUI, Observation (`@Observable`), AVFoundation, Security (Keychain), XcodeGen | Native 4-tab iPhone/iPad control client (`iOS 18.0+`, Liquid Glass on `iOS 26+`) |
 | **Core SDK (`ios/Packages/AntiCore`)** | **Swift 6.2** | SwiftPM, `URLSession` + `URLSessionWebSocketTask`, Swift Testing (`@Test`) | Sendable REST/WebSocket client, Keychain token store, pairing URI parser, offline Demo rig |
-| **Remote Bridge (`anti-bridge`)** | **JavaScript (ESM)** | Separate project (`/srv/antigravity/anti-bridge`) — Electron Tray/Menubar GUI + Node.js 20+ CLI | Cross-platform Windows / macOS / Linux remote bridge wrapping documented `agy` CLI |
+| **Remote Bridge ([`anti-bridge`](https://github.com/fishuvn/anti-bridge))** | **Rust + Tauri v2** | Separate repo (`fishuvn/anti-bridge`) — Native GUI (Tray / Menu Bar) + standalone CLI (`amd64` & `arm64`) | Cross-platform Windows / macOS / Linux bridge wrapping documented `agy` CLI without mutating CLI settings |
 | **CI/CD & Changelog (`.github/`)** | **YAML + JavaScript** | GitHub Actions (`macos-15` Xcode 26.3, `ubuntu-latest`), `gh` CLI | Automated Bridge + Swift tests, `.ipa` build (signed/unsigned), auto Vietnamese GitHub Release |
 
 ## Adaptive iOS 18 & iOS 26 Liquid Glass UI
@@ -48,20 +48,15 @@ Built against the **Xcode 26 (iOS 26 SDK)** with `deploymentTarget: 18.0`:
 - `.github/workflows/ios-ipa-release.yml` & `.github/scripts/generate-vi-changelog.mjs` — Automated `.ipa` build and Vietnamese changelog release pipeline.
 - `PRODUCT.md` & `DESIGN.md` — Product truth and Apple HIG design system contract.
 
-> **Companion Remote Bridge:** Split into its own standalone cross-platform project at `/srv/antigravity/anti-bridge` (Windows / macOS / Linux Desktop GUI with taskbar tray / macOS menubar + zero-dependency headless CLI).
+> **Companion Remote Bridge:** Hosted in its own cross-platform Rust + Tauri v2 repository at [fishuvn/anti-bridge](https://github.com/fishuvn/anti-bridge) (Windows / macOS / Linux `amd64` & `arm64` Desktop Tray/Menu Bar GUI + standalone headless CLI).
 
 ## 1. Run the Companion Remote Bridge (`anti-bridge`)
 
-On your remote Windows, macOS, or Linux machine:
+Download the prebuilt GUI installer (`.exe`, `.dmg`, `.deb` / `.AppImage`) or standalone CLI binary from [fishuvn/anti-bridge Releases](https://github.com/fishuvn/anti-bridge/releases/latest), then run:
 
 ```bash
-cd /srv/antigravity/anti-bridge
-
-# Headless CLI (zero install, Node.js 20+)
-node ./src/cli.mjs --workspace /path/to/your/project
-
-# Or Desktop GUI (Windows taskbar tray / macOS menubar / Linux system tray)
-npm install && npm run gui
+# Headless CLI (Windows / macOS / Linux, amd64 & arm64)
+anti-bridge --workspace /path/to/your/project
 ```
 
 - Automatically uses `agy` when installed on `PATH` (`--adapter auto`), or falls back cleanly to `--adapter mock` for local testing.
